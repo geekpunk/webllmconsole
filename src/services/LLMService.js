@@ -1,0 +1,110 @@
+import { CreateMLCEngine } from "@mlc-ai/web-llm";
+
+// Available models can be configured here or fetched dynamically if needed
+export const AVAILABLE_MODELS = [
+    {
+        id: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
+        name: "Llama 3.2 1B (Fastest)",
+        vram_required_MB: 1000,
+    },
+    {
+        id: "Llama-3.2-3B-Instruct-q4f16_1-MLC",
+        name: "Llama 3.2 3B (Balanced)",
+        vram_required_MB: 2500,
+    },
+    {
+        id: "Llama-3.1-8B-Instruct-q4f32_1-MLC",
+        name: "Llama 3.1 8B (High Quality)",
+        vram_required_MB: 6100,
+    },
+    {
+        id: "Gemma-2-2b-it-q4f16_1-MLC",
+        name: "Gemma 2 2B",
+        vram_required_MB: 1500
+    }
+];
+
+class LLMService {
+    constructor() {
+        this.engine = null;
+        this.currentModelId = null;
+        this.initPromise = null;
+    }
+
+    async initialize(modelId, progressCallback) {
+        if (this.currentModelId === modelId && this.engine) {
+            return;
+        }
+
+        this.currentModelId = modelId;
+
+        try {
+            this.engine = await CreateMLCEngine(
+                modelId,
+                { initProgressCallback: progressCallback }
+            );
+        } catch (error) {
+            console.error("Failed to initialize engine", error);
+            throw error;
+        }
+    }
+
+    async chat(messages, onUpdate, onFinish) {
+        if (!this.engine) {
+            throw new Error("Engine not initialized");
+        }
+
+        try {
+            const chunks = await this.engine.chat.completions.create({
+                messages,
+                stream: true,
+            });
+
+            let fullResponse = "";
+            for await (const chunk of chunks) {
+                const content = chunk.choices[0]?.delta?.content || "";
+                fullResponse += content;
+                onUpdate(fullResponse);
+            }
+
+            if (onFinish) {
+                onFinish(fullResponse);
+            }
+            return fullResponse;
+        } catch (error) {
+            console.error("Chat generation failed", error);
+            throw error;
+        }
+    }
+
+    async interrupt() {
+        if (this.engine) {
+            await this.engine.interruptGenerate();
+        }
+    }
+
+    async generateTitle(messages) {
+        if (!this.engine || messages.length < 2) return null;
+
+        // Create a separate non-streaming request for title generation
+        // We use a simplified prompt
+        const titleMessages = [
+            ...messages.slice(0, 3), // Context
+            { role: "user", content: "Generate a short, concise title (3-5 words max) for this conversation. Do not use quotes. Return ONLY the title." }
+        ];
+
+        try {
+            const response = await this.engine.chat.completions.create({
+                messages: titleMessages,
+                stream: false,
+                max_tokens: 20
+            });
+            return response.choices[0].message.content.trim();
+        } catch (error) {
+            console.error("Title generation failed", error);
+            return null;
+        }
+    }
+}
+
+export const llmService = new LLMService();
