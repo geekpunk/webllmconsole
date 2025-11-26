@@ -24,9 +24,8 @@ const ChatList = () => {
 
     return (
         <div style={{
-            width: 'var(--sidebar-width)',
+            width: '100%',
             height: '100%',
-            borderRight: '1px solid var(--border-color)',
             display: 'flex',
             flexDirection: 'column',
             backgroundColor: 'var(--surface-color)'

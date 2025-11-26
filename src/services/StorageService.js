@@ -9,7 +9,8 @@ const STORAGE_KEYS = {
 const DEFAULT_SETTINGS = {
   searchProvider: 'wikipedia', // 'wikipedia' or 'google'
   googleApiKey: '',
-  googleCx: ''
+  googleCx: '',
+  systemPrompt: 'You are a helpful AI assistant.'
 };
 
 export const StorageService = {

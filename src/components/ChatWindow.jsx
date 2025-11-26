@@ -4,8 +4,10 @@ import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
 import ModelSelector from './ModelSelector';
 import SettingsModal from './SettingsModal';
+
 import ExportDialog from './ExportDialog';
-import { Loader2 } from 'lucide-react';
+import ChatSettingsModal from './ChatSettingsModal';
+import { Loader2, ArrowLeft, SlidersHorizontal } from 'lucide-react';
 import { useState } from 'react';
 
 const ChatWindow = () => {
@@ -21,12 +23,17 @@ const ChatWindow = () => {
         settings,
         updateSettings,
         stopGeneration,
+
+
         exportChats,
-        importChats
+        importChats,
+        setCurrentChatId,
+        updateChat
     } = useChat();
 
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+    const [isChatSettingsOpen, setIsChatSettingsOpen] = useState(false);
     const messagesEndRef = useRef(null);
     const currentChat = chats.find(c => c.id === currentChatId);
 
@@ -77,10 +84,45 @@ const ChatWindow = () => {
                 padding: '0 24px',
                 backgroundColor: 'var(--bg-color)'
             }}>
-                <h2 style={{ fontSize: '1.1rem', fontWeight: 600 }}>
-                    {currentChat?.title || 'New Chat'}
-                </h2>
-                <ModelSelector />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button
+                        className="mobile-back-button"
+                        onClick={() => setCurrentChatId(null)}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-primary)',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}
+                    >
+                        <ArrowLeft size={24} />
+                    </button>
+                    <h2 style={{ fontSize: '1.1rem', fontWeight: 600 }}>
+                        {currentChat?.title || 'New Chat'}
+                    </h2>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                        onClick={() => setIsChatSettingsOpen(true)}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}
+                        title="Chat Settings"
+                    >
+                        <SlidersHorizontal size={20} />
+                    </button>
+                    <ModelSelector />
+                </div>
             </div>
 
             {/* Messages Area */}
@@ -160,6 +202,14 @@ const ChatWindow = () => {
                 isOpen={isExportDialogOpen}
                 onClose={() => setIsExportDialogOpen(false)}
                 onConfirm={handleExport}
+            />
+
+            <ChatSettingsModal
+                isOpen={isChatSettingsOpen}
+                onClose={() => setIsChatSettingsOpen(false)}
+                chat={currentChat}
+                onSave={updateChat}
+                globalSettings={settings}
             />
 
             <style>{`

@@ -56,6 +56,15 @@ export const ChatProvider = ({ children }) => {
         }
     }, [currentChatId]);
 
+    const updateChat = useCallback((chatId, updates) => {
+        const chat = chats.find(c => c.id === chatId);
+        if (chat) {
+            const updatedChat = { ...chat, ...updates };
+            StorageService.saveChat(updatedChat);
+            setChats(prev => prev.map(c => c.id === chatId ? updatedChat : c));
+        }
+    }, [chats]);
+
     const sendMessage = useCallback(async (content) => {
         if (!currentChatId) return;
 
@@ -67,7 +76,12 @@ export const ChatProvider = ({ children }) => {
         // Perform Web Search if enabled
         if (isSearchEnabled) {
             try {
-                searchResults = await WebSearchService.search(content, settings.searchProvider, settings);
+                const currentChat = chats.find(c => c.id === currentChatId);
+                const effectiveSearchProvider = (currentChat?.searchProvider && currentChat.searchProvider !== 'default')
+                    ? currentChat.searchProvider
+                    : settings.searchProvider;
+
+                searchResults = await WebSearchService.search(content, effectiveSearchProvider, settings);
                 if (searchResults.length > 0) {
                     const contextString = searchResults.map(r => `[${r.source}] ${r.title}: ${r.snippet} (${r.url})`).join('\n');
                     finalContent = `Context from web search:\n${contextString}\n\nUser Query: ${content}`;
@@ -119,10 +133,19 @@ export const ChatProvider = ({ children }) => {
             }
 
             // Prepare messages for LLM (exclude timestamp, use actualContent)
-            const llmMessages = newMessages.map(msg => ({
+            let llmMessages = newMessages.map(msg => ({
                 role: msg.role,
                 content: msg.actualContent || msg.content
             }));
+
+            // Inject System Prompt
+            const currentChat = chats.find(c => c.id === currentChatId);
+            const systemPrompt = currentChat?.systemPrompt || settings.systemPrompt;
+
+            if (systemPrompt) {
+                // Ensure system prompt is the very first message
+                llmMessages.unshift({ role: 'system', content: systemPrompt });
+            }
 
             // Stream response
             let aiMessage = {
@@ -131,6 +154,8 @@ export const ChatProvider = ({ children }) => {
                 timestamp: Date.now(),
                 modelId: currentModelId // Store model ID
             };
+
+
 
             await llmService.chat(
                 llmMessages,
@@ -234,6 +259,7 @@ export const ChatProvider = ({ children }) => {
         currentModelId,
         createNewChat,
         deleteChat,
+        updateChat,
         sendMessage,
         switchModel,
         settings,

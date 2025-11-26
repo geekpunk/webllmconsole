@@ -1,25 +1,17 @@
 import React from 'react';
+import { useChat } from '../context/ChatContext';
 import ChatList from './ChatList';
 import ChatWindow from './ChatWindow';
 
 const AppLayout = () => {
+    const { currentChatId } = useChat();
+
     return (
-        <div style={{
-            display: 'flex',
-            width: '100%',
-            height: '100vh',
-            backgroundColor: 'var(--bg-color)',
-            color: 'var(--text-primary)',
-            overflow: 'hidden'
-        }}>
-            <ChatList />
-            <main style={{
-                flex: 1,
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                backgroundColor: 'var(--bg-color)'
-            }}>
+        <div className={`app-layout ${currentChatId ? 'chat-active' : ''}`}>
+            <div className="sidebar-container">
+                <ChatList />
+            </div>
+            <main className="main-container">
                 <ChatWindow />
             </main>
         </div>

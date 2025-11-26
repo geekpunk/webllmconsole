@@ -65,6 +65,29 @@ const SettingsModal = ({ isOpen, onClose, settings, onSave, onExport, onImport }
 
                 <div style={{ padding: '24px' }}>
                     <div style={{ marginBottom: '20px' }}>
+                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>Global System Prompt</label>
+                        <textarea
+                            value={localSettings.systemPrompt || ''}
+                            onChange={(e) => handleChange('systemPrompt', e.target.value)}
+                            placeholder="Enter a default system prompt for all chats..."
+                            style={{
+                                width: '100%',
+                                padding: '8px 12px',
+                                borderRadius: '6px',
+                                border: '1px solid var(--border-color)',
+                                backgroundColor: 'var(--surface-color)',
+                                color: 'var(--text-primary)',
+                                minHeight: '80px',
+                                resize: 'vertical',
+                                fontFamily: 'inherit'
+                            }}
+                        />
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                            This prompt will be used if a chat doesn't have a specific one set.
+                        </p>
+                    </div>
+
+                    <div style={{ marginBottom: '20px' }}>
                         <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>Search Provider</label>
                         <select
                             value={localSettings.searchProvider}
