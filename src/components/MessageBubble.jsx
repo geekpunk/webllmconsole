@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { User, Bot } from 'lucide-react';
+import { User, Bot, Link as LinkIcon } from 'lucide-react';
 import { AVAILABLE_MODELS } from '../services/LLMService';
 
 const MessageBubble = ({ message }) => {
@@ -87,6 +87,44 @@ const MessageBubble = ({ message }) => {
                         {new Date(message.timestamp).toLocaleDateString()} {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                 </div>
+
+                {message.searchResults && message.searchResults.length > 0 && (
+                    <div style={{
+                        marginTop: '8px',
+                        paddingTop: '8px',
+                        borderTop: '1px solid rgba(0,0,0,0.1)',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '8px'
+                    }}>
+                        {message.searchResults.map((result, idx) => (
+                            <a
+                                key={idx}
+                                href={result.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={result.title}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    color: 'inherit',
+                                    textDecoration: 'none',
+                                    fontSize: '0.75rem',
+                                    opacity: 0.9,
+                                    backgroundColor: 'rgba(0,0,0,0.05)',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px'
+                                }}
+                            >
+                                <LinkIcon size={12} />
+                                <span style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {result.title}
+                                </span>
+                            </a>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );
