@@ -1,15 +1,26 @@
 import React, { useState } from 'react';
 import { useChat } from '../context/ChatContext';
-import { MessageSquarePlus, Trash2, MessageSquare, Settings } from 'lucide-react';
+import { MessageSquarePlus, Trash2, MessageSquare, Settings, Info } from 'lucide-react';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import SettingsModal from './SettingsModal';
 import ExportDialog from './ExportDialog';
+import AboutModal from './AboutModal';
 
 const ChatList = () => {
     const { chats, currentChatId, setCurrentChatId, createNewChat, deleteChat, settings, updateSettings, exportChats, importChats } = useChat();
     const [chatToDelete, setChatToDelete] = useState(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+    const [isAboutOpen, setIsAboutOpen] = useState(false);
+
+    // Check for first time visit
+    React.useEffect(() => {
+        const hasVisited = localStorage.getItem('web_llm_has_visited');
+        if (!hasVisited) {
+            setIsAboutOpen(true);
+            localStorage.setItem('web_llm_has_visited', 'true');
+        }
+    }, []);
 
     const handleDeleteConfirm = () => {
         if (chatToDelete) {
@@ -54,6 +65,22 @@ const ChatList = () => {
                         title="Settings"
                     >
                         <Settings size={18} />
+                    </button>
+                    <button
+                        onClick={() => setIsAboutOpen(true)}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}
+                        title="About"
+                    >
+                        <Info size={18} />
                     </button>
                 </div>
                 <button
@@ -196,6 +223,11 @@ const ChatList = () => {
                 isOpen={isExportDialogOpen}
                 onClose={() => setIsExportDialogOpen(false)}
                 onConfirm={handleExport}
+            />
+
+            <AboutModal
+                isOpen={isAboutOpen}
+                onClose={() => setIsAboutOpen(false)}
             />
         </div>
     );
