@@ -1,22 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { getAvailableModels } from '../services/LLMService';
 
-const ChatSettingsModal = ({ isOpen, onClose, chat, onSave, globalSettings }) => {
+const ChatSettingsModal = ({ isOpen, onClose, chat, onSave, globalSettings, downloadProgress }) => {
     const [systemPrompt, setSystemPrompt] = useState('');
     const [searchProvider, setSearchProvider] = useState('default');
+    const [modelId, setModelId] = useState('default');
+    const availableModels = getAvailableModels();
 
     useEffect(() => {
         if (chat) {
             setSystemPrompt(chat.systemPrompt || '');
             setSearchProvider(chat.searchProvider || 'default');
+            setModelId(chat.modelId || 'default');
         }
     }, [chat, isOpen]);
 
     if (!isOpen || !chat) return null;
 
     const handleSave = () => {
-        onSave(chat.id, { systemPrompt, searchProvider });
+        onSave(chat.id, {
+            systemPrompt,
+            searchProvider,
+            modelId: modelId === 'default' ? null : modelId
+        });
         onClose();
+    };
+
+    const handleModelChange = (e) => {
+        const value = e.target.value;
+        if (value !== 'default') {
+            const isOptimized = value.includes("Llama-3.2-1B") || value.includes("Gemma-2-2b");
+            if (!isOptimized) {
+                const confirmed = window.confirm("Warning: This model is not optimized for this device and may have slow load times or performance issues. Do you want to continue?");
+                if (!confirmed) return;
+            }
+        }
+        setModelId(value);
     };
 
     return (
@@ -27,6 +47,7 @@ const ChatSettingsModal = ({ isOpen, onClose, chat, onSave, globalSettings }) =>
             right: 0,
             bottom: 0,
             backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(5px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -53,7 +74,43 @@ const ChatSettingsModal = ({ isOpen, onClose, chat, onSave, globalSettings }) =>
                     </button>
                 </div>
 
-                <div style={{ padding: '24px' }}>
+                <div style={{ padding: '24px', maxHeight: '70vh', overflowY: 'auto' }}>
+                    <div style={{ marginBottom: '20px' }}>
+                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>Model Override</label>
+                        <select
+                            value={modelId}
+                            onChange={handleModelChange}
+                            style={{
+                                width: '100%',
+                                padding: '8px 12px',
+                                borderRadius: '6px',
+                                border: '1px solid var(--border-color)',
+                                backgroundColor: 'var(--surface-color)',
+                                color: 'var(--text-primary)'
+                            }}
+                        >
+                            <option value="default">Use Global Default</option>
+                            {availableModels.map(model => (
+                                <option key={model.id} value={model.id}>
+                                    {model.name} ({Math.round(model.vram_required_MB / 1024 * 10) / 10} GB)
+                                </option>
+                            ))}
+                        </select>
+                        {/* Download indicators */}
+                        <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            {availableModels.map(model => {
+                                const progress = downloadProgress?.[model.id];
+                                if (!progress) return null;
+                                return (
+                                    <div key={model.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                        <span>{model.name}</span>
+                                        <span>{progress.text}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
                     <div style={{ marginBottom: '20px' }}>
                         <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>System Prompt</label>
                         <textarea

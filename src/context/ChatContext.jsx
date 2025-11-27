@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { StorageService } from '../services/StorageService';
-import { llmService, AVAILABLE_MODELS } from '../services/LLMService';
+import { llmService, AVAILABLE_MODELS, getAvailableModels } from '../services/LLMService';
 import { WebSearchService } from '../services/WebSearchService';
 
 const ChatContext = createContext();
@@ -13,9 +13,109 @@ export const ChatProvider = ({ children }) => {
     const [messages, setMessages] = useState([]);
     const [isGenerating, setIsGenerating] = useState(false);
     const [modelLoadingProgress, setModelLoadingProgress] = useState(null);
-    const [currentModelId, setCurrentModelId] = useState(AVAILABLE_MODELS[0].id); // Default to first model
-    const [settings, setSettings] = useState(StorageService.getSettings());
+    const [isFirstTimeUser, setIsFirstTimeUser] = useState(!StorageService.isFTUECompleted());
+    const [downloadProgress, setDownloadProgress] = useState({});
+
+    const [loadingTargetModelId, setLoadingTargetModelId] = useState(null);
+
+    // Check if default models are ready (Only Llama 1B is required for initial load now)
+    const areDefaultModelsReady = [
+        "Llama-3.2-1B-Instruct-q4f16_1-MLC"
+    ].every(id => downloadProgress[id]?.text === "Ready");
+
+    const completeFTUE = useCallback(() => {
+        StorageService.setFTUECompleted();
+        setIsFirstTimeUser(false);
+    }, []);
+
+    // Initialize settings with default model if not present
+    const [settings, setSettings] = useState(() => {
+        const saved = StorageService.getSettings();
+        if (!saved.defaultModelId) {
+            // Default to Llama 3.2 1B
+            return { ...saved, defaultModelId: "Llama-3.2-1B-Instruct-q4f16_1-MLC" };
+        }
+        return saved;
+    });
+
+    const [currentModelId, setCurrentModelId] = useState(settings.defaultModelId);
     const [isSearchEnabled, setIsSearchEnabled] = useState(false);
+
+    // Auto-download models on mount
+    useEffect(() => {
+        const downloadModels = async () => {
+            const modelsToDownload = [
+                "Llama-3.2-1B-Instruct-q4f16_1-MLC"
+            ];
+
+            const availableIds = getAvailableModels().map(m => m.id);
+            const targets = modelsToDownload.filter(id => availableIds.includes(id));
+
+            for (const modelId of targets) {
+                // Check if already cached? web-llm doesn't expose this easily without init.
+                // We'll just start the download process.
+                await llmService.downloadModel(modelId, (progress) => {
+                    setDownloadProgress(prev => ({
+                        ...prev,
+                        [modelId]: progress
+                    }));
+                });
+
+                setDownloadProgress(prev => ({
+                    ...prev,
+                    [modelId]: { text: "Ready", progress: 1 }
+                }));
+            }
+        };
+
+        // Small delay to let UI render first
+        setTimeout(downloadModels, 1000);
+    }, []);
+
+    // ... (rest of useEffects)
+
+    // ... (createNewChat, deleteChat, updateChat, sendMessage, switchModel)
+
+    const updateSettings = useCallback(async (newSettings) => {
+        setSettings(newSettings);
+        StorageService.saveSettings(newSettings);
+
+        // Check if default model changed and needs downloading
+        if (newSettings.defaultModelId) {
+            const modelId = newSettings.defaultModelId;
+            // Check if we have progress indicating it's ready
+            const isReady = downloadProgress[modelId]?.text === "Ready";
+
+            if (!isReady) {
+                setLoadingTargetModelId(modelId);
+                try {
+                    await llmService.downloadModel(modelId, (progress) => {
+                        setDownloadProgress(prev => ({ ...prev, [modelId]: progress }));
+                    });
+                    setDownloadProgress(prev => ({ ...prev, [modelId]: { text: "Ready", progress: 1 } }));
+                } catch (e) {
+                    console.error("Failed to download", e);
+                } finally {
+                    setLoadingTargetModelId(null);
+                }
+            }
+
+            // If no chat is open, update current model to default
+            if (!currentChatId) {
+                setCurrentModelId(modelId);
+            }
+        }
+    }, [currentChatId, downloadProgress]);
+
+    // ... (stopGeneration, exportChats, importChats, refreshModels)
+
+
+
+    // ... (rest of useEffects)
+
+    // ... (createNewChat, deleteChat, updateChat, sendMessage, switchModel)
+
+    // ... (stopGeneration, exportChats, importChats, refreshModels)
 
     // Load chats on mount
     useEffect(() => {
@@ -35,18 +135,22 @@ export const ChatProvider = ({ children }) => {
             const chat = chats.find(c => c.id === currentChatId);
             if (chat && chat.modelId) {
                 setCurrentModelId(chat.modelId);
+            } else {
+                setCurrentModelId(settings.defaultModelId);
             }
         } else {
             setMessages([]);
+            setCurrentModelId(settings.defaultModelId);
         }
-    }, [currentChatId, chats]);
+    }, [currentChatId, chats, settings.defaultModelId]);
 
     const createNewChat = useCallback(() => {
-        const newChat = StorageService.createChat(currentModelId);
+        // Use default model for new chat
+        const newChat = StorageService.createChat(settings.defaultModelId);
         setChats(prev => [newChat, ...prev]);
         setCurrentChatId(newChat.id);
         return newChat;
-    }, [currentModelId]);
+    }, [settings.defaultModelId]);
 
     const deleteChat = useCallback((chatId) => {
         StorageService.deleteChat(chatId);
@@ -62,11 +166,20 @@ export const ChatProvider = ({ children }) => {
             const updatedChat = { ...chat, ...updates };
             StorageService.saveChat(updatedChat);
             setChats(prev => prev.map(c => c.id === chatId ? updatedChat : c));
+
+            // If updating current chat's model, update state
+            if (chatId === currentChatId && updates.modelId) {
+                setCurrentModelId(updates.modelId);
+            }
         }
-    }, [chats]);
+    }, [chats, currentChatId]);
 
     const sendMessage = useCallback(async (content) => {
         if (!currentChatId) return;
+
+        // Get System Prompt early to store in messages
+        const currentChat = chats.find(c => c.id === currentChatId);
+        const systemPrompt = currentChat?.systemPrompt || settings.systemPrompt;
 
         let finalContent = content;
         let searchResults = [];
@@ -76,7 +189,6 @@ export const ChatProvider = ({ children }) => {
         // Perform Web Search if enabled
         if (isSearchEnabled) {
             try {
-                const currentChat = chats.find(c => c.id === currentChatId);
                 const effectiveSearchProvider = (currentChat?.searchProvider && currentChat.searchProvider !== 'default')
                     ? currentChat.searchProvider
                     : settings.searchProvider;
@@ -96,7 +208,8 @@ export const ChatProvider = ({ children }) => {
             content: content, // Display original content to user
             actualContent: finalContent, // Send augmented content to LLM
             timestamp: Date.now(),
-            searchResults: searchResults // Store results to display in UI if needed
+            searchResults: searchResults, // Store results to display in UI if needed
+            systemPrompt: systemPrompt // Store system prompt for inspection
         };
 
         const newMessages = [...messages, userMessage];
@@ -124,9 +237,12 @@ export const ChatProvider = ({ children }) => {
         setIsGenerating(true);
 
         try {
+            // Determine effective model ID
+            const effectiveModelId = currentChat?.modelId || settings.defaultModelId || getAvailableModels()[0].id;
+
             // Initialize model if needed
-            if (llmService.currentModelId !== currentModelId) {
-                await llmService.initialize(currentModelId, (progress) => {
+            if (llmService.currentModelId !== effectiveModelId) {
+                await llmService.initialize(effectiveModelId, (progress) => {
                     setModelLoadingProgress(progress);
                 });
                 setModelLoadingProgress(null);
@@ -139,9 +255,6 @@ export const ChatProvider = ({ children }) => {
             }));
 
             // Inject System Prompt
-            const currentChat = chats.find(c => c.id === currentChatId);
-            const systemPrompt = currentChat?.systemPrompt || settings.systemPrompt;
-
             if (systemPrompt) {
                 // Ensure system prompt is the very first message
                 llmMessages.unshift({ role: 'system', content: systemPrompt });
@@ -152,7 +265,8 @@ export const ChatProvider = ({ children }) => {
                 role: 'assistant',
                 content: '',
                 timestamp: Date.now(),
-                modelId: currentModelId // Store model ID
+                modelId: effectiveModelId, // Store model ID
+                systemPrompt: systemPrompt // Store system prompt
             };
 
 
@@ -186,24 +300,20 @@ export const ChatProvider = ({ children }) => {
             setModelLoadingProgress(null);
             // Optionally add error message to chat
         }
-    }, [currentChatId, messages, currentModelId, chats, isSearchEnabled, settings]);
+    }, [currentChatId, messages, chats, isSearchEnabled, settings]);
 
     const switchModel = useCallback((modelId) => {
-        setCurrentModelId(modelId);
-        // If we are in a chat, update that chat's preferred model
+        // This is now mostly used for settings or manual override if we allow it
+        // But per requirements, we change settings or chat settings.
+        // If we want to change the CURRENT chat's model:
         if (currentChatId) {
-            const chat = chats.find(c => c.id === currentChatId);
-            if (chat) {
-                StorageService.saveChat({ ...chat, modelId });
-                setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, modelId } : c));
-            }
+            updateChat(currentChatId, { modelId });
+        } else {
+            // If no chat, maybe update default? No, that should be explicit.
+            // Just update local state for preview?
+            setCurrentModelId(modelId);
         }
-    }, [currentChatId, chats]);
-
-    const updateSettings = useCallback((newSettings) => {
-        setSettings(newSettings);
-        StorageService.saveSettings(newSettings);
-    }, []);
+    }, [currentChatId, updateChat]);
 
     const stopGeneration = useCallback(async () => {
         await llmService.interrupt();
@@ -249,6 +359,40 @@ export const ChatProvider = ({ children }) => {
         });
     }, [currentChatId]);
 
+    const refreshModels = useCallback(async () => {
+        // Reset progress for default models to trigger loading screen
+        setDownloadProgress(prev => {
+            const next = { ...prev };
+            ["Llama-3.2-1B-Instruct-q4f16_1-MLC", "gemma-2-2b-it-q4f32_1-MLC-1k"].forEach(id => {
+                delete next[id];
+            });
+            return next;
+        });
+
+        // Trigger download again
+        const modelsToDownload = [
+            "gemma-2-2b-it-q4f32_1-MLC-1k",
+            "Llama-3.2-1B-Instruct-q4f16_1-MLC"
+        ];
+
+        const availableIds = getAvailableModels().map(m => m.id);
+        const targets = modelsToDownload.filter(id => availableIds.includes(id));
+
+        for (const modelId of targets) {
+            await llmService.downloadModel(modelId, (progress) => {
+                setDownloadProgress(prev => ({
+                    ...prev,
+                    [modelId]: progress
+                }));
+            });
+
+            setDownloadProgress(prev => ({
+                ...prev,
+                [modelId]: { text: "Ready", progress: 1 }
+            }));
+        }
+    }, []);
+
     const value = {
         chats,
         currentChatId,
@@ -256,6 +400,7 @@ export const ChatProvider = ({ children }) => {
         messages,
         isGenerating,
         modelLoadingProgress,
+        downloadProgress,
         currentModelId,
         createNewChat,
         deleteChat,
@@ -268,7 +413,12 @@ export const ChatProvider = ({ children }) => {
         setIsSearchEnabled,
         stopGeneration,
         exportChats,
-        importChats
+        importChats,
+        isFirstTimeUser,
+        completeFTUE,
+        areDefaultModelsReady,
+        refreshModels,
+        loadingTargetModelId
     };
 
     return (

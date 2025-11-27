@@ -1,13 +1,22 @@
 import React, { useState, useRef } from 'react';
-import { X, Download, Upload } from 'lucide-react';
+import { X, Download, Upload, RefreshCw } from 'lucide-react';
+import { getAvailableModels } from '../services/LLMService';
 
-const SettingsModal = ({ isOpen, onClose, settings, onSave, onExport, onImport }) => {
+const SettingsModal = ({ isOpen, onClose, settings, onSave, onExport, onImport, downloadProgress, onRefreshModels }) => {
     const [localSettings, setLocalSettings] = useState(settings);
     const fileInputRef = useRef(null);
+    const availableModels = getAvailableModels();
 
     if (!isOpen) return null;
 
     const handleChange = (key, value) => {
+        if (key === 'defaultModelId') {
+            const isOptimized = value.includes("Llama-3.2-1B") || value.includes("Gemma-2-2b");
+            if (!isOptimized) {
+                const confirmed = window.confirm("Warning: This model is not optimized for this device and may have slow load times or performance issues. Do you want to continue?");
+                if (!confirmed) return;
+            }
+        }
         setLocalSettings(prev => ({ ...prev, [key]: value }));
     };
 
@@ -29,6 +38,8 @@ const SettingsModal = ({ isOpen, onClose, settings, onSave, onExport, onImport }
         }
     };
 
+
+
     return (
         <div style={{
             position: 'fixed',
@@ -37,6 +48,7 @@ const SettingsModal = ({ isOpen, onClose, settings, onSave, onExport, onImport }
             right: 0,
             bottom: 0,
             backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(5px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -63,7 +75,42 @@ const SettingsModal = ({ isOpen, onClose, settings, onSave, onExport, onImport }
                     </button>
                 </div>
 
-                <div style={{ padding: '24px' }}>
+                <div style={{ padding: '24px', maxHeight: '70vh', overflowY: 'auto' }}>
+                    <div style={{ marginBottom: '20px' }}>
+                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>Default Model</label>
+                        <select
+                            value={localSettings.defaultModelId || availableModels[0]?.id}
+                            onChange={(e) => handleChange('defaultModelId', e.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '8px 12px',
+                                borderRadius: '6px',
+                                border: '1px solid var(--border-color)',
+                                backgroundColor: 'var(--surface-color)',
+                                color: 'var(--text-primary)'
+                            }}
+                        >
+                            {availableModels.map(model => (
+                                <option key={model.id} value={model.id}>
+                                    {model.name} ({Math.round(model.vram_required_MB / 1024 * 10) / 10} GB)
+                                </option>
+                            ))}
+                        </select>
+                        {/* Download indicators */}
+                        <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            {availableModels.map(model => {
+                                const progress = downloadProgress?.[model.id];
+                                if (!progress) return null;
+                                return (
+                                    <div key={model.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                        <span>{model.name}</span>
+                                        <span>{progress.text}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
                     <div style={{ marginBottom: '20px' }}>
                         <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>Global System Prompt</label>
                         <textarea
@@ -147,7 +194,7 @@ const SettingsModal = ({ isOpen, onClose, settings, onSave, onExport, onImport }
 
                     <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--border-color)' }}>
                         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px' }}>Data Management</h3>
-                        <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                             <button
                                 onClick={onExport}
                                 style={{
@@ -165,7 +212,7 @@ const SettingsModal = ({ isOpen, onClose, settings, onSave, onExport, onImport }
                                 }}
                             >
                                 <Download size={18} />
-                                Export Data
+                                Export
                             </button>
 
                             <button
@@ -185,8 +232,9 @@ const SettingsModal = ({ isOpen, onClose, settings, onSave, onExport, onImport }
                                 }}
                             >
                                 <Upload size={18} />
-                                Import Data
+                                Import
                             </button>
+
                             <input
                                 type="file"
                                 ref={fileInputRef}

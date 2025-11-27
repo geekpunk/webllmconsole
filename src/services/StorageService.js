@@ -4,6 +4,7 @@ const STORAGE_KEYS = {
   CHATS: 'web_llm_chats',
   MESSAGES_PREFIX: 'web_llm_messages_',
   SETTINGS: 'web_llm_settings',
+  FTUE_COMPLETED: 'web_llm_ftue_completed',
 };
 
 const DEFAULT_SETTINGS = {
@@ -14,6 +15,14 @@ const DEFAULT_SETTINGS = {
 };
 
 export const StorageService = {
+  isFTUECompleted: () => {
+    return localStorage.getItem(STORAGE_KEYS.FTUE_COMPLETED) === 'true';
+  },
+
+  setFTUECompleted: () => {
+    localStorage.setItem(STORAGE_KEYS.FTUE_COMPLETED, 'true');
+  },
+
   getChats: () => {
     try {
       const chats = localStorage.getItem(STORAGE_KEYS.CHATS);

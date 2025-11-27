@@ -7,20 +7,13 @@ import ExportDialog from './ExportDialog';
 import AboutModal from './AboutModal';
 
 const ChatList = () => {
-    const { chats, currentChatId, setCurrentChatId, createNewChat, deleteChat, settings, updateSettings, exportChats, importChats } = useChat();
+    const { chats, currentChatId, setCurrentChatId, createNewChat, deleteChat, settings, updateSettings, exportChats, importChats, isGenerating } = useChat();
     const [chatToDelete, setChatToDelete] = useState(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
     const [isAboutOpen, setIsAboutOpen] = useState(false);
 
-    // Check for first time visit
-    React.useEffect(() => {
-        const hasVisited = localStorage.getItem('web_llm_has_visited');
-        if (!hasVisited) {
-            setIsAboutOpen(true);
-            localStorage.setItem('web_llm_has_visited', 'true');
-        }
-    }, []);
+
 
     const handleDeleteConfirm = () => {
         if (chatToDelete) {
@@ -85,19 +78,21 @@ const ChatList = () => {
                 </div>
                 <button
                     onClick={createNewChat}
+                    disabled={isGenerating}
                     style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
                         padding: '8px 16px',
-                        backgroundColor: 'var(--primary-color)',
+                        backgroundColor: isGenerating ? 'var(--text-secondary)' : 'var(--primary-color)',
                         color: 'white',
                         border: 'none',
                         borderRadius: '20px',
                         fontSize: '0.9rem',
                         fontWeight: 500,
-                        cursor: 'pointer',
-                        transition: 'background-color 0.2s'
+                        cursor: isGenerating ? 'not-allowed' : 'pointer',
+                        transition: 'background-color 0.2s',
+                        opacity: isGenerating ? 0.7 : 1
                     }}
                 >
                     <MessageSquarePlus size={18} />
@@ -184,13 +179,14 @@ const ChatList = () => {
                                         e.stopPropagation();
                                         setChatToDelete(chat.id);
                                     }}
+                                    disabled={isGenerating}
                                     style={{
                                         background: 'none',
                                         border: 'none',
                                         padding: '4px',
-                                        cursor: 'pointer',
+                                        cursor: isGenerating ? 'not-allowed' : 'pointer',
                                         color: 'var(--text-secondary)',
-                                        opacity: 0.6
+                                        opacity: isGenerating ? 0.3 : 0.6
                                     }}
                                     title="Delete chat"
                                 >

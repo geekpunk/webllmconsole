@@ -2,12 +2,11 @@ import React, { useEffect, useRef } from 'react';
 import { useChat } from '../context/ChatContext';
 import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
-import ModelSelector from './ModelSelector';
 import SettingsModal from './SettingsModal';
 
 import ExportDialog from './ExportDialog';
 import ChatSettingsModal from './ChatSettingsModal';
-import { Loader2, ArrowLeft, SlidersHorizontal } from 'lucide-react';
+import { Loader2, ArrowLeft, SlidersHorizontal, Download } from 'lucide-react';
 import { useState } from 'react';
 
 const ChatWindow = () => {
@@ -17,6 +16,7 @@ const ChatWindow = () => {
         sendMessage,
         isGenerating,
         modelLoadingProgress,
+        downloadProgress,
         chats,
         isSearchEnabled,
         setIsSearchEnabled,
@@ -28,7 +28,11 @@ const ChatWindow = () => {
         exportChats,
         importChats,
         setCurrentChatId,
-        updateChat
+        updateChat,
+        refreshModels,
+        loadingTargetModelId,
+        areDefaultModelsReady,
+        isFirstTimeUser
     } = useChat();
 
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -43,7 +47,16 @@ const ChatWindow = () => {
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages, isGenerating]);
+    }, [messages, isGenerating, downloadProgress]);
+
+    // Close modals when loading screen appears
+    useEffect(() => {
+        if (loadingTargetModelId || (!areDefaultModelsReady && !isFirstTimeUser)) {
+            setIsSettingsOpen(false);
+            setIsChatSettingsOpen(false);
+            setIsExportDialogOpen(false);
+        }
+    }, [loadingTargetModelId, areDefaultModelsReady, isFirstTimeUser]);
 
     const handleExport = (filename) => {
         exportChats(filename);
@@ -121,7 +134,6 @@ const ChatWindow = () => {
                     >
                         <SlidersHorizontal size={20} />
                     </button>
-                    <ModelSelector />
                 </div>
             </div>
 
@@ -167,6 +179,27 @@ const ChatWindow = () => {
                     </div>
                 )}
 
+                {/* Download Indicators */}
+                {Object.entries(downloadProgress).map(([id, progress]) => {
+                    if (progress.text === "Ready") return null; // Hide if ready
+                    return (
+                        <div key={id} style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '8px 12px',
+                            backgroundColor: 'var(--surface-color)',
+                            borderRadius: '8px',
+                            margin: '4px 0',
+                            fontSize: '0.8rem',
+                            color: 'var(--text-secondary)'
+                        }}>
+                            <Download size={14} />
+                            <span>{id.split('-')[0]}: {progress.text}</span>
+                        </div>
+                    );
+                })}
+
                 {isGenerating && !modelLoadingProgress && (
                     <div style={{ display: 'flex', gap: '8px', padding: '8px' }}>
                         <div className="typing-dot" style={{ width: '8px', height: '8px', backgroundColor: 'var(--text-secondary)', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both' }}></div>
@@ -196,6 +229,8 @@ const ChatWindow = () => {
                 onSave={updateSettings}
                 onExport={() => setIsExportDialogOpen(true)}
                 onImport={importChats}
+                downloadProgress={downloadProgress}
+                onRefreshModels={refreshModels}
             />
 
             <ExportDialog
@@ -210,6 +245,7 @@ const ChatWindow = () => {
                 chat={currentChat}
                 onSave={updateChat}
                 globalSettings={settings}
+                downloadProgress={downloadProgress}
             />
 
             <style>{`

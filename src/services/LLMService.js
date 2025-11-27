@@ -1,28 +1,39 @@
-import { CreateMLCEngine } from "@mlc-ai/web-llm";
+import { CreateMLCEngine, hasModelInCache } from "@mlc-ai/web-llm";
+
+export const isMobile = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
 
 // Available models can be configured here or fetched dynamically if needed
-export const AVAILABLE_MODELS = [
+const ALL_MODELS = [
     {
         id: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
         name: "Llama 3.2 1B (Fastest)",
         vram_required_MB: 1000,
+        mobile: true
     },
     {
         id: "Llama-3.2-3B-Instruct-q4f16_1-MLC",
         name: "Llama 3.2 3B (Balanced)",
         vram_required_MB: 2500,
+        mobile: false
     },
     {
-        id: "Llama-3.1-8B-Instruct-q4f32_1-MLC",
-        name: "Llama 3.1 8B (High Quality)",
-        vram_required_MB: 6100,
-    },
-    {
-        id: "Gemma-2-2b-it-q4f16_1-MLC",
+        id: "gemma-2-2b-it-q4f32_1-MLC-1k",
         name: "Gemma 2 2B",
-        vram_required_MB: 1500
+        vram_required_MB: 1500,
+        mobile: true
     }
 ];
+
+export const getAvailableModels = () => {
+    if (isMobile()) {
+        return ALL_MODELS.filter(m => m.mobile);
+    }
+    return ALL_MODELS;
+};
+
+export const AVAILABLE_MODELS = ALL_MODELS; // Keep for backward compatibility if needed, but prefer getAvailableModels()
 
 class LLMService {
     constructor() {
@@ -46,6 +57,32 @@ class LLMService {
         } catch (error) {
             console.error("Failed to initialize engine", error);
             throw error;
+        }
+    }
+
+    // Just download the model without keeping it loaded as the active engine if possible
+    async downloadModel(modelId, progressCallback) {
+        try {
+            const isCached = await hasModelInCache(modelId);
+            if (isCached) {
+                if (progressCallback) {
+                    progressCallback({ text: "Ready", progress: 1 });
+                }
+                return;
+            }
+
+            // We use a temporary engine to download to cache
+            const engine = await CreateMLCEngine(
+                modelId,
+                { initProgressCallback: progressCallback }
+            );
+            // We don't set this.engine because we don't want to switch the active model context yet
+            // unless we want to.
+            // But CreateMLCEngine might use resources.
+            // Ideally we should unload it after download.
+            await engine.unload();
+        } catch (error) {
+            console.error(`Failed to download model ${modelId}`, error);
         }
     }
 
