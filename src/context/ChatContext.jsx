@@ -297,6 +297,63 @@ export const ChatProvider = ({ children }) => {
                 llmMessages.unshift({ role: 'system', content: systemPrompt });
             }
 
+            // Prune messages to fit context window
+            // Estimate tokens (4 chars per token)
+            const estimateTokens = (msgs) => msgs.reduce((acc, msg) => acc + (msg.content?.length || 0) / 4, 0);
+
+            // Reserve 20% for response
+            const tokenLimit = Math.floor(contextWindow * 0.8);
+
+            let currentTokens = estimateTokens(llmMessages);
+
+            if (currentTokens > tokenLimit) {
+                console.warn(`Conversation history exceeds token limit (${Math.round(currentTokens)} > ${tokenLimit}). Pruning...`);
+
+                // Keep system prompt (if exists) and the last message (user's new message)
+                // We will remove messages from the beginning of the history (after system prompt)
+
+                const hasSystemPrompt = llmMessages.length > 0 && llmMessages[0].role === 'system';
+                const systemMsg = hasSystemPrompt ? llmMessages[0] : null;
+                const lastMsg = llmMessages[llmMessages.length - 1];
+
+                // Candidates for removal: everything between system prompt and last message
+                let candidates = hasSystemPrompt ? llmMessages.slice(1, -1) : llmMessages.slice(0, -1);
+
+                while (candidates.length > 0 && currentTokens > tokenLimit) {
+                    // Remove oldest
+                    candidates.shift();
+
+                    // Reconstruct llmMessages
+                    const newHistory = [];
+                    if (systemMsg) newHistory.push(systemMsg);
+                    newHistory.push(...candidates);
+                    newHistory.push(lastMsg);
+
+                    currentTokens = estimateTokens(newHistory);
+
+                    if (currentTokens <= tokenLimit) {
+                        llmMessages = newHistory;
+                        break;
+                    }
+
+                    // If we removed all candidates and it's still too big, we might need to truncate the last message (which we already did partially above)
+                    // But for now, just update llmMessages for the next iteration check (though we reconstruct it every time)
+                }
+
+                // Final check: if still too big after removing all history, we must use just the system prompt + last message (possibly truncated further if we really wanted to be safe, but we handled last message truncation earlier)
+                if (candidates.length === 0 && currentTokens > tokenLimit) {
+                    llmMessages = [];
+                    if (systemMsg) llmMessages.push(systemMsg);
+                    llmMessages.push(lastMsg);
+                } else if (candidates.length !== (hasSystemPrompt ? llmMessages.length - 2 : llmMessages.length - 1)) {
+                    // We pruned some, so update llmMessages with what's left in candidates
+                    llmMessages = [];
+                    if (systemMsg) llmMessages.push(systemMsg);
+                    llmMessages.push(...candidates);
+                    llmMessages.push(lastMsg);
+                }
+            }
+
             // Stream response
             let aiMessage = {
                 role: 'assistant',
