@@ -36,9 +36,8 @@ npm run dev
 Open in Browser: Navigate to http://localhost:8000 in your WebGPU-supported browser.
 
 ## 🚀 How to Use
-### Select a Model: Use the selector in the chat header to choose a model.
-
-Tip: The first time you select a model, it will download to your device. This may take a few moments depending on your internet speed. It is cached for future use.
+Select a Model: Use the selector in the chat header to choose a model.
+*Tip* : The first time you select a model, it will download to your device. This may take a few moments depending on your internet speed. It is cached for future use.
 
 Start Chatting: Type your message and press send. The AI responds instantly, running entirely on your computer's GPU.
 
