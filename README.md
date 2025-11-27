@@ -8,7 +8,7 @@ Secure, Private AI running entirely in your browser.
 
 ![screenshot](./screenshot.png)
 
-Web LLM Chat is a modern, secure chat application that runs Large Language Models (LLMs) directly in your browser. Unlike traditional AI services, your chat data never leaves your device. The model runs locally using WebGPU, ensuring complete privacy and security for your conversations.
+Web LLM Chat is a modern, secure chat application that runs Large Language Models (LLMs) directly in your browser. Unlike traditional AI services, your chat data never leaves your device. The model runs locally using WebGPU, ensuring complete privacy and security for your conversations.  The goal was to provide a pure client side, no longing, very transportable llm chat console.  
 
 Check it out here: https://geekpunk.github.io/webllmconsole/ or install locally.
 
