@@ -1,11 +1,10 @@
-# Web LLM Chat
-
 ```text
  __      __      _      _    _     __  __    ___ _           _   
  \ \    / /___  | |__  | |  | |   |  \/  |  / __| |_   __ _ | |_ 
   \ \/\/ // -_) | '_ \ | |__| |__ | |\/| | | (__| ' \ / _` ||  _|
    \_/\_/ \___| |_.__/ |____|____||_|  |_|  \___|_||_|\__,_| \__|
 Secure, Private AI running entirely in your browser.
+```
 
 ![screenshot](./screenshot.png)
 
