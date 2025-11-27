@@ -1,21 +1,16 @@
 
-````markdown
-# Web LLM Chat
 
-```text
  __      __      _      _    _     __  __    ___ _           _   
  \ \    / /___  | |__  | |  | |   |  \/  |  / __| |_   __ _ | |_ 
   \ \/\/ // -_) | '_ \ | |__| |__ | |\/| | | (__| ' \ / _` ||  _|
    \_/\_/ \___| |_.__/ |____|____||_|  |_|  \___|_||_|\__,_| \__|
-````
+
 
 > **Secure, Private AI running entirely in your browser.**
 
-*(Note: Replace `./screenshot.png` with the actual path to your image)*
+[screenshot](./screenshot.png)
 
-**Web LLM Chat** is a modern, secure chat application that runs Large Language Models (LLMs) directly in your browser. Unlike traditional AI services, **your chat data never leaves your device**. The model runs locally using WebGPU, ensuring complete privacy and security for your conversations.  This was written and runs well on a macbook air, so any modern laptop should do.
-
-[See Demo](https://storage.googleapis.com/webllm/index.html_)
+**Web LLM Chat** is a modern, secure chat application that runs Large Language Models (LLMs) directly in your browser. Unlike traditional AI services, **your chat data never leaves your device**. The model runs locally using WebGPU and your local device GPU, ensuring complete privacy and security for your conversations.  This was written and runs well on a macbook air, so any modern laptop should do.[See Demo](https://storage.googleapis.com/webllm/index.html)
 -----
 
 ## 📋 Table of Contents
