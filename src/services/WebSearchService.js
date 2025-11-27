@@ -9,18 +9,35 @@ export const WebSearchService = {
 
     searchWikipedia: async (query) => {
         try {
-            const endpoint = `https://en.wikipedia.org/w/api.php?action=query&list=search&prop=info&inprop=url&utf8=&format=json&origin=*&srlimit=3&srsearch=${encodeURIComponent(query)}`;
-            const response = await fetch(endpoint);
-            const data = await response.json();
+            // 1. Search for pages
+            const searchEndpoint = `https://en.wikipedia.org/w/api.php?action=query&list=search&prop=info&inprop=url&utf8=&format=json&origin=*&srlimit=3&srsearch=${encodeURIComponent(query)}`;
+            const searchResponse = await fetch(searchEndpoint);
+            const searchData = await searchResponse.json();
 
-            if (!data.query || !data.query.search) return [];
+            if (!searchData.query || !searchData.query.search || searchData.query.search.length === 0) return [];
 
-            return data.query.search.map(result => ({
-                title: result.title,
-                snippet: result.snippet.replace(/<[^>]*>/g, ''), // Strip HTML tags
-                url: `https://en.wikipedia.org/?curid=${result.pageid}`,
-                source: 'Wikipedia'
-            }));
+            const results = searchData.query.search;
+            const pageIds = results.map(r => r.pageid).join('|');
+
+            // 2. Fetch extracts for found pages
+            const extractsEndpoint = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&pageids=${pageIds}&format=json&origin=*`;
+            const extractsResponse = await fetch(extractsEndpoint);
+            const extractsData = await extractsResponse.json();
+
+            const pages = extractsData.query?.pages || {};
+
+            return results.map(result => {
+                const pageDetails = pages[result.pageid];
+                // Use the extract if available, otherwise fallback to the search snippet
+                const content = pageDetails?.extract || result.snippet.replace(/<[^>]*>/g, '');
+
+                return {
+                    title: result.title,
+                    snippet: content, // Now contains the intro paragraphs
+                    url: `https://en.wikipedia.org/?curid=${result.pageid}`,
+                    source: 'Wikipedia'
+                };
+            });
         } catch (error) {
             console.error('Wikipedia search failed', error);
             return [];

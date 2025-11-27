@@ -10,19 +10,22 @@ const ALL_MODELS = [
         id: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
         name: "Llama 3.2 1B (Fastest)",
         vram_required_MB: 1000,
-        mobile: true
+        mobile: true,
+        context_window: 128000
     },
     {
         id: "Llama-3.2-3B-Instruct-q4f16_1-MLC",
         name: "Llama 3.2 3B (Balanced)",
         vram_required_MB: 2500,
-        mobile: false
+        mobile: false,
+        context_window: 128000
     },
     {
         id: "gemma-2-2b-it-q4f32_1-MLC-1k",
         name: "Gemma 2 2B",
         vram_required_MB: 1500,
-        mobile: true
+        mobile: true,
+        context_window: 8192
     }
 ];
 
@@ -140,6 +143,27 @@ class LLMService {
         } catch (error) {
             console.error("Title generation failed", error);
             return null;
+        }
+    }
+
+    async summarize(text) {
+        if (!this.engine || !text) return text;
+
+        const messages = [
+            { role: "system", content: "You are a helpful assistant." },
+            { role: "user", content: `Summarize the following text into exactly 2 sentences:\n\n${text}` }
+        ];
+
+        try {
+            const response = await this.engine.chat.completions.create({
+                messages,
+                stream: false,
+                max_tokens: 150
+            });
+            return response.choices[0].message.content.trim();
+        } catch (error) {
+            console.error("Summary generation failed", error);
+            return text; // Fallback to original text
         }
     }
 }

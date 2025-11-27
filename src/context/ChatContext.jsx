@@ -186,59 +186,41 @@ export const ChatProvider = ({ children }) => {
 
         setIsGenerating(true);
 
-        // Perform Web Search if enabled
-        if (isSearchEnabled) {
-            try {
-                const effectiveSearchProvider = (currentChat?.searchProvider && currentChat.searchProvider !== 'default')
-                    ? currentChat.searchProvider
-                    : settings.searchProvider;
-
-                searchResults = await WebSearchService.search(content, effectiveSearchProvider, settings);
-                if (searchResults.length > 0) {
-                    const contextString = searchResults.map(r => `[${r.source}] ${r.title}: ${r.snippet} (${r.url})`).join('\n');
-                    finalContent = `Context from web search:\n${contextString}\n\nUser Query: ${content}`;
-                }
-            } catch (error) {
-                console.error("Search failed", error);
-            }
-        }
-
-        const userMessage = {
-            role: 'user',
-            content: content, // Display original content to user
-            actualContent: finalContent, // Send augmented content to LLM
-            timestamp: Date.now(),
-            searchResults: searchResults, // Store results to display in UI if needed
-            systemPrompt: systemPrompt // Store system prompt for inspection
-        };
-
-        const newMessages = [...messages, userMessage];
-
-        // Optimistically update UI
-        setMessages(newMessages);
-        StorageService.saveMessages(currentChatId, newMessages);
-
-        // Update chat list preview
-        setChats(prev => {
-            const newChats = [...prev];
-            const index = newChats.findIndex(c => c.id === currentChatId);
-            if (index !== -1) {
-                newChats[index] = {
-                    ...newChats[index],
-                    lastMessageAt: Date.now(),
-                    preview: content.substring(0, 50) + (content.length > 50 ? '...' : '')
-                };
-                // Re-sort
-                newChats.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
-            }
-            return newChats;
-        });
-
-        setIsGenerating(true);
-
         try {
             // Determine effective model ID
             const effectiveModelId = currentChat?.modelId || settings.defaultModelId || getAvailableModels()[0].id;
+            const effectiveModel = getAvailableModels().find(m => m.id === effectiveModelId);
+            const contextWindow = effectiveModel?.context_window || 4096;
+
+            // Safety margin: keep 20% free for response and system prompt
+            const maxTokens = Math.floor(contextWindow * 0.8);
+            const maxChars = maxTokens * 4; // Approximate 4 chars per token
+
+            // Truncate content if necessary
+            if (finalContent.length > maxChars) {
+                console.warn(`Content length (${finalContent.length}) exceeds model context limit (${maxChars}). Truncating...`);
+
+                // If we have web context, try to truncate that first
+                if (finalContent.includes("Context from web search:")) {
+                    const userQueryPart = `\n\nUser Query: ${content}`;
+                    const availableCharsForContext = maxChars - userQueryPart.length;
+
+                    if (availableCharsForContext > 0) {
+                        const truncatedContext = finalContent.substring(0, availableCharsForContext) + "... [truncated]";
+                        // Reconstruct carefully to ensure we don't lose the user query if possible, 
+                        // but here we are truncating the whole string. 
+                        // Let's do it more smartly:
+                        const contextPart = finalContent.split("\n\nUser Query:")[0];
+                        const truncatedContextPart = contextPart.substring(0, availableCharsForContext) + "... [truncated]";
+                        finalContent = `${truncatedContextPart}${userQueryPart}`;
+                    } else {
+                        // Edge case: User query itself is too long? Just truncate everything.
+                        finalContent = finalContent.substring(0, maxChars) + "... [truncated]";
+                    }
+                } else {
+                    finalContent = finalContent.substring(0, maxChars) + "... [truncated]";
+                }
+            }
 
             // Initialize model if needed
             if (llmService.currentModelId !== effectiveModelId) {
@@ -247,6 +229,61 @@ export const ChatProvider = ({ children }) => {
                 });
                 setModelLoadingProgress(null);
             }
+
+            // Perform Web Search if enabled
+            if (isSearchEnabled) {
+                try {
+                    const effectiveSearchProvider = (currentChat?.searchProvider && currentChat.searchProvider !== 'default')
+                        ? currentChat.searchProvider
+                        : settings.searchProvider;
+
+                    searchResults = await WebSearchService.search(content, effectiveSearchProvider, settings);
+
+                    if (searchResults.length > 0) {
+                        // Summarize each result using the LLM
+                        for (let i = 0; i < searchResults.length; i++) {
+                            const summary = await llmService.summarize(searchResults[i].snippet);
+                            searchResults[i].snippet = summary;
+                        }
+
+                        const contextString = searchResults.map(r => `[${r.source}] ${r.title}: ${r.snippet} (${r.url})`).join('\n');
+                        finalContent = `Context from web search:\n${contextString}\n\nUser Query: ${content}`;
+                    }
+                } catch (error) {
+                    console.error("Search failed", error);
+                }
+            }
+
+            const userMessage = {
+                role: 'user',
+                content: content, // Display original content to user
+                actualContent: finalContent, // Send augmented content to LLM
+                timestamp: Date.now(),
+                searchResults: searchResults, // Store results to display in UI if needed
+                systemPrompt: systemPrompt // Store system prompt for inspection
+            };
+
+            const newMessages = [...messages, userMessage];
+
+            // Optimistically update UI
+            setMessages(newMessages);
+            StorageService.saveMessages(currentChatId, newMessages);
+
+            // Update chat list preview
+            setChats(prev => {
+                const newChats = [...prev];
+                const index = newChats.findIndex(c => c.id === currentChatId);
+                if (index !== -1) {
+                    newChats[index] = {
+                        ...newChats[index],
+                        lastMessageAt: Date.now(),
+                        preview: content.substring(0, 50) + (content.length > 50 ? '...' : '')
+                    };
+                    // Re-sort
+                    newChats.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+                }
+                return newChats;
+            });
 
             // Prepare messages for LLM (exclude timestamp, use actualContent)
             let llmMessages = newMessages.map(msg => ({
