@@ -1,5 +1,6 @@
 import React from 'react';
 import { Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { AVAILABLE_MODELS } from '../services/LLMService';
 
 const LoadingScreen = ({ downloadProgress, onContinue, areModelsReady, targetModelIds }) => {
     // Filter to only show the required models
@@ -51,7 +52,8 @@ const LoadingScreen = ({ downloadProgress, onContinue, areModelsReady, targetMod
                     {requiredModels.map(modelId => {
                         const progress = downloadProgress[modelId];
                         const isReady = progress?.text === "Ready";
-                        const name = modelId.includes("Llama") ? "Llama 3.2 1B" : "Gemma 2 2B";
+                        const modelInfo = AVAILABLE_MODELS.find(m => m.id === modelId);
+                        const name = modelInfo ? modelInfo.name : modelId;
 
                         return (
                             <div key={modelId} style={{

@@ -1,11 +1,10 @@
-import { CreateMLCEngine, hasModelInCache } from "@mlc-ai/web-llm";
+import { CreateMLCEngine, hasModelInCache, prebuiltAppConfig } from "@mlc-ai/web-llm";
 
 export const isMobile = () => {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 };
 
-// Available models can be configured here or fetched dynamically if needed
-const ALL_MODELS = [
+const DEFAULT_MODELS = [
     {
         id: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
         name: "Llama 3.2 1B (Fastest)",
@@ -28,6 +27,25 @@ const ALL_MODELS = [
         context_window: 8192
     }
 ];
+
+const formatModelName = (modelId) => {
+    return modelId
+        .replace(/-MLC.*/, "")
+        .replace(/-/g, " ");
+};
+
+const OTHER_MODELS = prebuiltAppConfig.model_list
+    .filter(m => !DEFAULT_MODELS.some(dm => dm.id === m.model_id))
+    .map(m => ({
+        id: m.model_id,
+        name: formatModelName(m.model_id),
+        vram_required_MB: m.vram_required_MB || 4000,
+        mobile: m.low_resource_required || false,
+        context_window: m.overrides?.context_window_size || 4096
+    }));
+
+// Available models can be configured here or fetched dynamically if needed
+const ALL_MODELS = [...DEFAULT_MODELS, ...OTHER_MODELS];
 
 export const getAvailableModels = () => {
     if (isMobile()) {
